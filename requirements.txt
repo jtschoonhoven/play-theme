@@ -1,0 +1,4 @@
+face_recognition
+flake8
+opencv-python
+pygame
