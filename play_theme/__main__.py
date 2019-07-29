@@ -169,6 +169,10 @@ def run(video_capture) -> None:
         # display video feed with overlay
         cv2.imshow('Video', frame)
 
+        # Hit 'q' on the keyboard to quit!
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
 
 try:
     # get a reference to webcam #0 (the default one)
