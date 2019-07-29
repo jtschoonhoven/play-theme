@@ -1,5 +1,6 @@
 """
-With minor changes, this has been adapted from:
+Use face_recognition library to play the theme song for a matched human.
+
 https://github.com/ageitgey/face_recognition/blob/master/examples/facerec_from_webcam_faster.py
 """
 import cv2
@@ -25,10 +26,6 @@ PERSON_NAMES = [re.split('[^a-zA-Z]+', f)[0].lower() for f in PHOTO_FILENAMES]
 TTL_CACHE_SECONDS = 15
 TTL_CACHE = TTLCache(maxsize=float('inf'), ttl=TTL_CACHE_SECONDS)
 
-# This is a demo of running face recognition on live video from your webcam.
-#   1. Process each video frame at 1/4 resolution (though still display it at full resolution)
-#   2. Only detect faces in every other frame of video.
-
 
 def get_username_from_filename(filename: str) -> str:
     """Parse a filename and return the initial alphabetic characters.
@@ -50,18 +47,22 @@ def play_theme_for_username_in_thread(username: str) -> None:
     # do nothing if a thread is currently alive
     if threading.active_count() > 1:
         return None
+
     # if user's theme has already been played within TTL, do nothing
     if TTL_CACHE.get(username):
         return None
+
     # add user to TTL cache to avoid playing too frequently
     TTL_CACHE[username] = True
+
     theme_filenames = [f for f in SOUND_FILENAMES if get_username_from_filename(f) == username]
-    if theme_filenames:
-        filename = random.choice(theme_filenames)
-        thread = threading.Thread(target=_play_theme, args=[filename])
-        thread.start()
-    else:
+    if not theme_filenames:
         raise Exception(f'Failed to find theme for user {username}.')
+
+    # play the matched theme in a new thread
+    filename = random.choice(theme_filenames)
+    thread = threading.Thread(target=_play_theme, args=[filename])
+    thread.start()
 
 
 def _play_theme(filename: str) -> None:
@@ -73,6 +74,7 @@ def _play_theme(filename: str) -> None:
 
 
 def get_known_face_encodings():
+    """Load all headshots in photos dir and encode them for face recognition."""
     known_face_encodings = []
     for filename in sorted(PHOTO_FILENAMES):
         photo_path = path.join(PHOTOS_DIRPATH, filename)
@@ -82,8 +84,8 @@ def get_known_face_encodings():
     return known_face_encodings
 
 
-def get_known_face_names():
-    """"""
+def get_known_face_names() -> [str]:
+    """Return an array of usernames for each headshot in dir."""
     known_face_names = []
     for filename in sorted(PHOTO_FILENAMES):
         photo_subject = get_username_from_filename(filename)
@@ -91,9 +93,9 @@ def get_known_face_names():
     return known_face_names
 
 
-def process_frame(frame, known_face_encodings, known_face_names) -> None:
-    """"""
-    # Resize frame of video to 1/4 size for faster face recognition processing
+def process_frame(frame, known_face_encodings, known_face_names):
+    """Inspect a single video frame and play theme for any matched faces."""
+    # resize frame of video to 1/4 size for faster face recognition processing
     small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
 
     # Convert the image from BGR color (which OpenCV uses) to RGB color (for face_recognition)
@@ -105,11 +107,11 @@ def process_frame(frame, known_face_encodings, known_face_names) -> None:
     matched_face_names = []
 
     for matched_face_encoding in matched_face_encodings:
-        # See if the face is a match for the known face(s)
+        # see if the face is a match for the known face(s)
         matches = face_recognition.compare_faces(known_face_encodings, matched_face_encoding)
         name = "Unknown"
 
-        # Or instead, use the known face with the smallest distance to the new face
+        # or instead, use the known face with the smallest distance to the new face
         face_distances = face_recognition.face_distance(known_face_encodings, matched_face_encoding)
         best_match_index = np.argmin(face_distances)
         if matches[best_match_index]:
@@ -125,7 +127,7 @@ def process_frame(frame, known_face_encodings, known_face_names) -> None:
 
 
 def run(video_capture) -> None:
-    """"""
+    """Process video from a video capture feed, detect faces, play matching themes."""
     pygame.mixer.init()
 
     matched_face_locations = []
